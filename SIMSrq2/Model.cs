@@ -19,6 +19,7 @@ namespace SIMSrq2
     }
     class Model: ITimeObservable
     {
+        Dictionary<int, List<double>> orbitTimes;
         private HashSet<ITimeObserver> timers = new HashSet<ITimeObserver>();
         string path = "iamlog.txt";
         string str;
@@ -35,7 +36,7 @@ namespace SIMSrq2
         public double maxCalls;
         public double p;
 
-        public List<double> orbitLength;
+        public Dictionary<int,double> orbitLength;
 
         int inputCalls;
         int losingCalls;
@@ -91,6 +92,10 @@ namespace SIMSrq2
 
         public void EndSimulation()
         {
+            foreach (var item in orbitTimes)
+            {
+                orbitLength[item.Key] = item.Value.Sum()/maxTime;
+            }
             isRunning = false;
             File.WriteAllText(path, str);
             LogToExcel();
@@ -110,8 +115,10 @@ namespace SIMSrq2
 
             queue.currentLength = 0;
             queue.maxLength = N;
-            orbitLength = new List<double>();
+            orbitLength = new Dictionary<int, double>();
             this.p = p;
+
+            orbitTimes = new Dictionary<int, List<double>>();            
 
             inputCalls = 0;
             losingCalls = 0;
@@ -143,6 +150,8 @@ namespace SIMSrq2
             if (deltaTime == callFromOrbitTime) k = 4;
             
             currentTime += deltaTime;
+            orbitTimes.TryAdd(orbit.currentOrbitTime.Count, new List<double>());
+            orbitTimes[orbit.currentOrbitTime.Count].Add(deltaTime);
 
             UpdateTime(deltaTime);
             switch (k)
@@ -188,7 +197,6 @@ namespace SIMSrq2
                 //Обращение заявки с орбиты
                 case 4:
                     orbit.RemoveCall();
-                    orbitLength.Add(orbit.currentOrbitTime.Count);
                     if (secondPhase.isServing == false)
                         secondPhase.GetCall();
                     else
@@ -230,7 +238,6 @@ namespace SIMSrq2
             if (secondPhase.isServing)
             {
                 orbit.NewCall();
-                orbitLength.Add(orbit.currentOrbitTime.Count);
             }
             else
                 secondPhase.GetCall();
@@ -240,10 +247,11 @@ namespace SIMSrq2
         {
             workSheet = (Excel.Worksheet)workBook.Worksheets.get_Item(1);
             int i = 1;
-            foreach (double call in orbitLength)
+            foreach (var call in orbitLength)
             {
                 i++;
-                workSheet.Cells[i, 1] = call;
+                workSheet.Cells[i, 1] = call.Key;
+                workSheet.Cells[i, 2] = call.Value;
             }
         }
 
